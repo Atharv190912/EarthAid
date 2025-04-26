@@ -10,13 +10,27 @@ POINTS_FILE = "points.csv"
 
 # Initialize files if they don't exist
 if not os.path.exists(REPORTS_FILE):
-    pd.DataFrame(columns=["description", "latitude", "longitude", "username"]).to_csv(REPORTS_FILE, index=False)
+    pd.DataFrame(columns=["description", "category", "latitude", "longitude", "username"]).to_csv(REPORTS_FILE, index=False)
 
 if not os.path.exists(INITIATIVES_FILE):
     pd.DataFrame(columns=["name", "description", "contact"]).to_csv(INITIATIVES_FILE, index=False)
 
 if not os.path.exists(POINTS_FILE):
     pd.DataFrame(columns=["username", "lifepoints"]).to_csv(POINTS_FILE, index=False)
+
+# Category color map
+CATEGORY_COLORS = {
+    "Climate Change": [255, 0, 0],         # Red
+    "Deforestation": [0, 128, 0],          # Green
+    "Air Pollution": [128, 128, 128],      # Grey
+    "Water Scarcity": [0, 0, 255],         # Blue
+    "Biodiversity Loss": [255, 165, 0],    # Orange
+    "Ocean Acidification": [255, 255, 0],  # Yellow
+    "Soil Degradation": [165, 42, 42],     # Brown
+    "Microplastic Pollution": [255, 192, 203], # Pink
+    "Overfishing": [0, 128, 128],          # Teal
+    "Other": [128, 0, 128]                 # Purple
+}
 
 # List of cities (USA, India, UAE)
 cities = [
@@ -27,7 +41,6 @@ cities = [
     ("Fort Worth, USA", 32.7555, -97.3308), ("Columbus, USA", 39.9612, -82.9988), ("Charlotte, USA", 35.2271, -80.8431),
     ("San Francisco, USA", 37.7749, -122.4194), ("Indianapolis, USA", 39.7684, -86.1581), ("Seattle, USA", 47.6062, -122.3321),
     ("Denver, USA", 39.7392, -104.9903), ("Washington, USA", 38.9072, -77.0369),
-
     ("Mumbai, India", 19.0760, 72.8777), ("Delhi, India", 28.6139, 77.2090), ("Bangalore, India", 12.9716, 77.5946),
     ("Hyderabad, India", 17.3850, 78.4867), ("Ahmedabad, India", 23.0225, 72.5714), ("Chennai, India", 13.0827, 80.2707),
     ("Kolkata, India", 22.5726, 88.3639), ("Pune, India", 18.5204, 73.8567), ("Jaipur, India", 26.9124, 75.7873),
@@ -35,14 +48,13 @@ cities = [
     ("Indore, India", 22.7196, 75.8577), ("Bhopal, India", 23.2599, 77.4126), ("Patna, India", 25.5941, 85.1376),
     ("Ludhiana, India", 30.9000, 75.8573), ("Agra, India", 27.1767, 78.0081), ("Nashik, India", 19.9975, 73.7898),
     ("Vadodara, India", 22.3072, 73.1812), ("Rajkot, India", 22.3039, 70.8022),
-
     ("Dubai, UAE", 25.276987, 55.296249), ("Abu Dhabi, UAE", 24.4539, 54.3773), ("Sharjah, UAE", 25.3463, 55.4209),
     ("Al Ain, UAE", 24.1917, 55.7606), ("Ajman, UAE", 25.4052, 55.5136), ("Ras Al Khaimah, UAE", 25.8007, 55.9762),
     ("Fujairah, UAE", 25.1288, 56.3265), ("Umm Al Quwain, UAE", 25.5647, 55.5552), ("Khor Fakkan, UAE", 25.3313, 56.3565),
     ("Dibba, UAE", 25.6180, 56.2724), ("Kalba, UAE", 25.0951, 56.3623), ("Hatta, UAE", 24.8223, 56.1040),
     ("Madinat Zayed, UAE", 23.5843, 53.7084), ("Ruwais, UAE", 24.1103, 52.7300), ("Liwa Oasis, UAE", 23.1300, 53.7700),
     ("Jebel Ali, UAE", 24.9876, 55.0602), ("Al Dhaid, UAE", 25.2881, 55.8810), ("Ghayathi, UAE", 23.8859, 52.7513),
-    ("Mirfa, UAE", 24.1063, 53.4842), ("Dhaid, UAE", 25.2881, 55.8810)
+    ("Mirfa, UAE", 24.1063, 53.4842)
 ]
 
 # Page config
@@ -52,7 +64,7 @@ st.set_page_config(page_title="EarthAid", layout="wide")
 st.title("🌍 EarthAid")
 tabs = st.tabs(["Home", "Report Environment", "Live Earth Map", "Initiatives", "Profile", "Leaderboard"])
 
-# Home Page
+# Home Tab
 with tabs[0]:
     st.header("🏠 Home")
     st.markdown("**“We cut trees, build paper from it, and then write save trees on it — isn’t it ironic?”**")
@@ -92,14 +104,21 @@ with tabs[0]:
 with tabs[1]:
     st.header("📢 Report Your Environment")
     desc = st.text_area("Describe the issue:")
+    category = st.selectbox("Select Issue Category", list(CATEGORY_COLORS.keys()))
     city = st.selectbox("Select City", [c[0] for c in cities])
     lat, lon = next(((lat, lon) for c, lat, lon in cities if c == city), (None, None))
     username = st.text_input("Enter your Username")
 
     if st.button("Submit Report"):
-        if desc and lat and lon and username:
+        if desc and category and lat and lon and username:
             df = pd.read_csv(REPORTS_FILE)
-            df = pd.concat([df, pd.DataFrame([{"description": desc, "latitude": lat, "longitude": lon, "username": username}])], ignore_index=True)
+            df = pd.concat([df, pd.DataFrame([{
+                "description": desc,
+                "category": category,
+                "latitude": lat,
+                "longitude": lon,
+                "username": username
+            }])], ignore_index=True)
             df.to_csv(REPORTS_FILE, index=False)
 
             points_df = pd.read_csv(POINTS_FILE)
@@ -118,6 +137,7 @@ with tabs[2]:
     st.header("🗺️ Live Earth Map")
     df = pd.read_csv(REPORTS_FILE)
     if not df.empty:
+        df["color"] = df["category"].apply(lambda x: CATEGORY_COLORS.get(x, [128, 0, 128]))
         st.pydeck_chart(pdk.Deck(
             map_style='mapbox://styles/mapbox/light-v9',
             initial_view_state=pdk.ViewState(
@@ -131,13 +151,23 @@ with tabs[2]:
                     'ScatterplotLayer',
                     data=df,
                     get_position='[longitude, latitude]',
-                    get_color='[200, 30, 0, 160]',
+                    get_color='color',
                     get_radius=10000,
                 )
             ]
         ))
+
+        # 🌟 Add Legend
+        st.markdown("### 🖍️ Category Legend")
+        for category, color in CATEGORY_COLORS.items():
+            color_hex = '#%02x%02x%02x' % tuple(color)  # Convert RGB to HEX
+            st.markdown(
+                f"<span style='display: inline-block; width: 20px; height: 20px; background-color: {color_hex}; border-radius: 3px; margin-right: 10px;'></span> {category}",
+                unsafe_allow_html=True
+            )
     else:
         st.info("No reports yet to display on the map.")
+
 
 # Initiatives Tab
 with tabs[3]:
